@@ -25,14 +25,19 @@ npm install -g --prefix "$work/prefix" "agents-pod@$version" >"$work/npm.log" 2>
   exit 1
 }
 export PATH="$work/prefix/bin:$PATH"
+npm install -g --prefix "$work/prefix" agents-pod-channels >>"$work/npm.log" 2>&1 || {
+  cat "$work/npm.log"
+  echo "error: could not install agents-pod-channels from npm"
+  exit 1
+}
 agents-pod --help >/dev/null   # a core that cannot print its own table is not a core
 echo "smoke: agents-pod@$version from npm"
 
-channel="$repo/channels/feishu"
-
-# §4/§5: register once. The local sentinel anchors the record to this directory,
-# so the lane proves register → sync → doctor without a published package.
-agents-pod channel register feishu --local --dir "$channel"
+# §4/§5: register once, the operator's real path — the npm-installed package,
+# resolved through node_modules by the running core. The matrix (latest and
+# latest-but-one) is the peer-range handshake proven on two cores: a red names
+# the core version that broke the documented surface.
+agents-pod channel register feishu --package agents-pod-channels
 
 # §4: sync is a dry run unless --apply, and takes no channel name.
 agents-pod channel sync
@@ -68,7 +73,7 @@ import sys
 records = json.load(open(sys.argv[1]))
 record = next((entry for entry in records if entry["name"] == "feishu"), None)
 assert record is not None, records
-assert record.get("package") == "local", record
+assert record.get("package") == "agents-pod-channels", record
 names = sorted(entry["name"] for entry in record["files"])
 for required in (".env.example", "README.md", "feishu_client.py", "feishu_deliver.py", "feishu_drain.py"):
     assert required in names, (required, names)

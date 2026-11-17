@@ -44,7 +44,10 @@ jobs:
           node-version: "22"
       # §6: latest and latest-but-one. The peer-range handshake must tolerate a
       # new core and the release before it, or a range bump reaches operators a
-      # release late.
+      # release late. A broken release (0.8.1's packaged-register parse defect,
+      # fixed in 0.8.2) shows as red on its own matrix job — the version in the
+      # job name points at the responsible side — and heals when the next
+      # release rotates it out.
       - id: pick
         run: |
           latest=$(npm view agents-pod dist-tags.latest)
