@@ -1,0 +1,14 @@
+{
+  "name": "agents-pod-channels",
+  "description": "Platform channels for agents-pod: one directory per channel, mapped by manifest.json",
+  "license": "AGPL-3.0-or-later",
+  "private": true,
+  "files": [
+    "channels/",
+    "manifest.json"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fookhsu/agents-pod-channels.git"
+  }
+}

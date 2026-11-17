@@ -1,0 +1,11 @@
+{
+  "channels": {
+    "feishu": {
+      "dir": "channels/feishu"
+    }
+  },
+  "contracts": {
+    "drain": ">=1 <2",
+    "deliver": ">=1 <2"
+  }
+}
