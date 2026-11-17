@@ -136,7 +136,10 @@ class EchoDrainTest(unittest.TestCase):
 if __name__ == "__main__":
     unittest.main()
 EOF
-python3 -m unittest discover -s "$channel" -p "test_*.py"
+# Bytecode off: the tests run inside the throwaway tree and the tree goes on to
+# face register's subdirectory gate — a __pycache__ unittest regenerates here
+# would rightly fail it (the gate is the point; the residue is not).
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s "$channel" -p "test_*.py"
 
 # ── §4 the manifest, the local sentinel, argument-free sync ──────────────────
 # The manifest maps name → dir and declares the contract ranges; register reads

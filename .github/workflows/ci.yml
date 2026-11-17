@@ -60,9 +60,8 @@ jobs:
       fail-fast: false
       matrix:
         core: ${{ fromJSON(needs.core-versions.outputs.matrix) }}
-    # green when core's channel register/sync ships: the verbs scripts/smoke.sh
-    # drives are #94's target surface, not yet in a released core.
-    continue-on-error: true
+    # core 0.8.0+ ships the channel CLI; the lanes below are no longer
+    # rehearsals — red here is a real break of the documented surface.
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -78,8 +77,6 @@ jobs:
     runs-on: ubuntu-latest
     # The guide's acceptance test: scripts/zero-touch.sh cites a README section
     # per step, and a red run means the guide and the surface disagree.
-    # green when core's channel register/sync ships.
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
