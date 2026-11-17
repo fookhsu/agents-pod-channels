@@ -1,0 +1,91 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Three lanes plus the guide's acceptance test. No job clones the core
+# repository: released core arrives from npm, so "zero touches to core" is
+# structural — there is no checkout to touch.
+jobs:
+  channel-tests:
+    name: channel unittest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      # §6: stdlib only, offline. There is no pip install step, and adding one is
+      # the failure this lane exists to catch.
+      - run: python3 -m unittest discover -s channels/feishu -p "test_*.py" -v
+
+  manifest:
+    name: manifest integrity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      # §3/§4: every mapped dir exists, `files` covers it, `contracts` is
+      # declared — a bad package cannot reach npm.
+      - run: node scripts/check-manifest.mjs
+
+  core-versions:
+    name: core versions
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.pick.outputs.matrix }}
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      # §6: latest and latest-but-one. The peer-range handshake must tolerate a
+      # new core and the release before it, or a range bump reaches operators a
+      # release late.
+      - id: pick
+        run: |
+          latest=$(npm view agents-pod dist-tags.latest)
+          previous=$(npm view agents-pod versions --json | jq -r '[.[] | select(contains("-") | not)] | .[-2]')
+          echo "matrix=[\"$latest\",\"$previous\"]" >> "$GITHUB_OUTPUT"
+          echo "smoke over agents-pod@$latest and agents-pod@$previous"
+
+  smoke:
+    name: smoke (core ${{ matrix.core }})
+    needs: core-versions
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        core: ${{ fromJSON(needs.core-versions.outputs.matrix) }}
+    # green when core's channel register/sync ships: the verbs scripts/smoke.sh
+    # drives are #94's target surface, not yet in a released core.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: bash scripts/smoke.sh "${{ matrix.core }}"
+
+  zero-touch:
+    name: zero-touch (a fresh channel end-to-end)
+    runs-on: ubuntu-latest
+    # The guide's acceptance test: scripts/zero-touch.sh cites a README section
+    # per step, and a red run means the guide and the surface disagree.
+    # green when core's channel register/sync ships.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: bash scripts/zero-touch.sh
