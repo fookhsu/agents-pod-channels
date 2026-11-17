@@ -1,8 +1,8 @@
 {
   "name": "agents-pod-channels",
   "description": "Platform channels for agents-pod: one directory per channel, mapped by manifest.json",
+  "version": "1.0.0",
   "license": "AGPL-3.0-or-later",
-  "private": true,
   "files": [
     "channels/",
     "manifest.json"
