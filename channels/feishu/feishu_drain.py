@@ -103,7 +103,10 @@ def mentions_bot(msg, open_id):
     if not open_id:
         return True
     for mention in msg.get("mentions") or []:
-        if (mention.get("id") or {}).get("open_id") == open_id:
+        # mention.id may be a dict (a user) or the string "all" (@所有人) —
+        # measured on a live tenant; only the dict carries an open_id.
+        mid = mention.get("id")
+        if isinstance(mid, dict) and mid.get("open_id") == open_id:
             return True
     return False
 
@@ -111,6 +114,19 @@ def mentions_bot(msg, open_id):
 def is_system(msg):
     """A conversation event — invite, rename, pin — rather than a message."""
     return (msg.get("msg_type") or "") == SYSTEM_MSG_TYPE
+
+
+def inject_extra_chats(chats, extra):
+    """A p2p chat never appears in the chat list (ADR 0024), so an explicit id
+    is the only way to opt one in: FEISHU_EXTRA_CHATS injects chats the
+    enumeration cannot see. History-messages reads a p2p container fine given
+    a p2p scope. `extra` is the raw comma-separated variable value (or None);
+    already-listed ids are skipped, injected ones carry a `p2p` mark."""
+    ids = {c.strip() for c in (extra or "").split(",") if c.strip()}
+    listed = {c.get("chat_id") for c in chats}
+    for chat_id in sorted(ids - listed):
+        chats.append({"chat_id": chat_id, "name": chat_id, "p2p": True})
+    return chats
 
 
 def is_item(msg, *, require_mention, open_id):
@@ -266,6 +282,7 @@ def main():
         return 1
 
     chats = [c for c in chats if not allowlist or c.get("chat_id") in allowlist]
+    inject_extra_chats(chats, os.environ.get("FEISHU_EXTRA_CHATS"))
     chat_names = {c.get("chat_id"): (c.get("name") or c.get("chat_id")) for c in chats}
 
     pass_state = new_pass(require_mention=require_mention, open_id=open_id)
@@ -384,11 +401,12 @@ def self_check():
             print("  " + line)
         return 1
     chats = [c for c in visible if not allowlist or c.get("chat_id") in allowlist]
+    inject_extra_chats(chats, os.environ.get("FEISHU_EXTRA_CHATS"))
     if not chats:
         print("no readable chat: this app is in no group chat%s"
               % (" (or FEISHU_CHATS excludes every one)" if allowlist else ""))
         print("  add it: 群设置 → 群机器人 → 添加机器人 %s" % (bot.get("app_name") or ""))
-        print("  a p2p chat cannot be enumerated by a pull drain (ADR 0024)")
+        print("  a p2p chat is injected via FEISHU_EXTRA_CHATS=<chat_id>, never enumerated")
         return 1
     print("%d chat(s) visible%s" % (len(chats), ", %d allowed by FEISHU_CHATS" % len(allowlist)
                                     if allowlist else ""))

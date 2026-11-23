@@ -174,6 +174,11 @@ message is still subject to `FEISHU_REQUIRE_MENTION`.
 ## Switchboard (`.env`, or the environment — the environment wins)
 
 - `FEISHU_CHATS` — comma-separated `chat_id` allowlist; empty = every chat.
+- `FEISHU_EXTRA_CHATS` — comma-separated `chat_id`s to inject even though the
+  enumeration cannot see them: a p2p chat never appears in the chat list
+  (ADR 0024), so an explicit id is the only way to opt one in. History-messages
+  reads a p2p container fine given a p2p scope; injected chats carry a `p2p`
+  mark and their own cursor.
 - `FEISHU_REQUIRE_MENTION` — `1` reads only messages that @-mention the bot.
 - `FEISHU_LOOKBACK_SECONDS` (3600) / `FEISHU_OVERLAP_SECONDS` (60) /
   `FEISHU_MAX_ITEMS` (40) — first-run window, re-read overlap behind the

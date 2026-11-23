@@ -71,6 +71,18 @@ def run_pass(messages, *, cursor=None, require_mention=False, open_id=None, max_
     return kinds, [json.loads(line) for line in lines]
 
 
+def listed_chat(chat_id, name="群"):
+    """A chat as list_chats returns it — the inject fixture's "listed" side."""
+    return {"chat_id": chat_id, "name": name, "chat_id_type": "chat"}
+
+
+def inject(listed_ids, *, extra="oc_p2p"):
+    """inject_extra_chats over a listed set, as the two call sites do."""
+    return drain.inject_extra_chats(
+        [listed_chat(chat_id) for chat_id in listed_ids], extra
+    )
+
+
 class SystemEventTest(unittest.TestCase):
     def test_system_only_pass_prints_cursor_and_no_item(self):
         kinds, lines = run_pass([system_message("om_sys", at=BASE_AT)])
@@ -133,6 +145,72 @@ class ExistingFiltersTest(unittest.TestCase):
 
         self.assertEqual(kinds, ["skip"])
         self.assertEqual(lines, [{"cursor": str(BASE_AT)}])
+
+    def test_at_all_mention_does_not_crash_and_still_drops(self):
+        """The measured shape from a live tenant: @所有人 carries
+        mention.id == "all" (a string), not a dict. It is not the bot, so the
+        message is skipped — the bug was the crash before the skip (#126)."""
+        at_all = [{"key": "@所有人", "id": "all", "name": "所有人"}]
+        kinds, lines = run_pass(
+            [text_message("om_all", "@所有人 请查收", at=BASE_AT, mentions=at_all)],
+            require_mention=True,
+            open_id="ou_bot",
+        )
+
+        self.assertEqual(kinds, ["skip"])
+        self.assertEqual(lines, [{"cursor": str(BASE_AT)}])
+
+    def test_at_all_before_bot_mention_no_longer_stalls_the_cursor(self):
+        """The failure mode that froze a live cursor for three days: an @所有人
+        message ahead of a real @bot one made every pass crash, so the cursor
+        never crossed it. A pass must read past the "all" mention to the item."""
+        at_all = [{"key": "@所有人", "id": "all", "name": "所有人"}]
+        mentioned = [
+            {"key": "@bot", "id": {"union_id": "on", "open_id": "ou_bot"}, "name": "pod"}
+        ]
+        kinds, lines = run_pass(
+            [
+                text_message("om_all2", "@所有人 开会", at=BASE_AT, mentions=at_all),
+                text_message("om_at2", "@pod 收到", at=BASE_AT + 1, mentions=mentioned),
+            ],
+            require_mention=True,
+            open_id="ou_bot",
+        )
+
+        self.assertEqual(kinds, ["skip", "item"])
+        self.assertEqual([line["id"] for line in lines[:-1]], ["om_at2"])
+        self.assertEqual(lines[-1], {"cursor": str(BASE_AT + 1)})
+
+
+class ExtraChatsTest(unittest.TestCase):
+    """FEISHU_EXTRA_CHATS: p2p chats the enumeration cannot see (ADR 0024).
+
+    Pure on the same discipline as the rest of this file: the raw variable
+    value is a parameter, os.environ is never touched.
+    """
+
+    def test_extra_id_not_listed_is_injected_with_p2p_mark(self):
+        chats = inject(["oc_group"])
+        self.assertEqual(
+            chats,
+            [
+                {"chat_id": "oc_group", "name": "群", "chat_id_type": "chat"},
+                {"chat_id": "oc_p2p", "name": "oc_p2p", "p2p": True},
+            ],
+        )
+
+    def test_already_listed_id_is_not_duplicated(self):
+        chats = inject(["oc_group"], extra="oc_group")
+        self.assertEqual(len(chats), 1)
+
+    def test_blank_and_comma_edge_values_are_ignored(self):
+        for raw in (None, "", "  ", ",,"):
+            chats = inject([], extra=raw)
+            self.assertEqual(chats, [])
+        chats = inject([], extra=" oc_a ,, ")
+        self.assertEqual([c["chat_id"] for c in chats], ["oc_a"])
+        chats = inject([], extra=" oc_a ,, oc_b ")
+        self.assertEqual([c["chat_id"] for c in chats], ["oc_a", "oc_b"])
 
 
 class CursorTest(unittest.TestCase):
