@@ -1,7 +1,7 @@
 {
   "name": "agents-pod-channels",
   "description": "Platform channels for agents-pod: one directory per channel, mapped by manifest.json",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "license": "AGPL-3.0-or-later",
   "scripts": {
     "prepack": "find channels -name __pycache__ -type d -prune -exec rm -rf {} +"
